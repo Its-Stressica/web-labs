@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Чат кімната</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div class="chat-container">
+      <!-- Ліва панель з інформацією -->
+      <div class="chat-sidebar">
+        <h3>Room: <span id="room-name"></span></h3>
+        <h3>Username: <span id="my-username"></span></h3>
+        <h3>Users in the chatroom</h3>
+        <ul id="users"></ul>
+      </div>
+
+      <!-- Основна частина з повідомленнями -->
+      <div class="chat-main">
+        <div class="chat-messages" id="chat-messages"></div>
+
+        <div class="chat-form-container">
+          <form id="msg-form">
+            <input
+              id="msg"
+              type="text"
+              placeholder="Enter Message"
+              required
+              autocomplete="off"
+            />
+            <button type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Спочатку підключаємо Qs -->
+    <script src="https://cdn.jsdelivr.net/npm/qs/dist/qs.min.js"></script>
+    <!-- Потім socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      // Зчитуємо query params (username і room)
+      const { username, room } = Qs.parse(location.search, {
+        ignoreQueryPrefix: true,
+      });
+    </script>
+    <!-- Додайте бібліотеку qs (через cdn чи власний файл), щоб парсити URL-параметри -->
+    <script src="https://cdn.jsdelivr.net/npm/qs/dist/qs.min.js"></script>
+
+    <script>
+      const socket = io();
+
+      // При підключенні – надсилаємо на сервер подію "joinRoom"
+      socket.emit('joinRoom', { username, room });
+
+      // Отримуємо повідомлення 'message' з сервера
+      socket.on('message', (msgData) => {
+        outputMessage(msgData);
+        // Прокручуємо блок із повідомленнями вниз
+        const messagesContainer = document.getElementById('chat-messages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      });
+
+      // Отримуємо оновлений список користувачів у кімнаті
+      socket.on('roomUsers', ({ room, users }) => {
+        document.getElementById('room-name').innerText = room;
+        document.getElementById('my-username').innerText = username;
+        outputRoomUsers(users);
+      });
+
+      // Відправляємо своє повідомлення
+      const form = document.getElementById('msg-form');
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg').value;
+        // Надсилаємо повідомлення на сервер
+        socket.emit('chatMessage', msg);
+        // Очищаємо поле вводу
+        document.getElementById('msg').value = '';
+        document.getElementById('msg').focus();
+      });
+
+      // Функція для відображення повідомлення у вікні чату
+      function outputMessage({ username, text, time }) {
+        const div = document.createElement('div');
+        div.classList.add('message');
+        div.innerHTML = `
+          <p class="meta">${username} <span>${time || ''}</span></p>
+          <p class="text">
+            ${text}
+          </p>
+        `;
+        document.getElementById('chat-messages').appendChild(div);
+      }
+
+      // Оновлюємо список користувачів зліва
+      function outputRoomUsers(users) {
+        const usersList = document.getElementById('users');
+        usersList.innerHTML = users
+          .map((user) => `<li>${user.username}</li>`)
+          .join('');
+      }
+    </script>
+  </body>
+</html>
